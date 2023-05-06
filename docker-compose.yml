@@ -1,0 +1,83 @@
+version: "3.9"
+
+x-common-variables: &common-variables
+  POSTGRES_USER: debug
+  POSTGRES_PASSWORD: debug
+  POSTGRES_DB: medical
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    restart: always
+    environment:
+      <<: *common-variables
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data postgres
+    networks:
+      - roctnet
+
+  roctnetfrontend:
+    build:
+      context: ./roctnet_frontend
+      dockerfile: Dockerfile
+    container_name: roctnetfrontend
+    restart: always
+    environment:
+      BACKEND_URL: http://roctnetbackend:8000
+      MODEL_SERVING: http://roctnetmodel:8001
+    ports:
+      - 3000:3000
+    expose:
+      - 3000
+    # volumes:
+    #   - ./roctnet_backend:/app
+    networks:
+      - roctnet
+
+  roctnetbackend:
+    build:
+      context: ./roctnet_backend
+      dockerfile: Dockerfile
+    container_name: roctnetbackend
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      <<: *common-variables
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DJANGO_ALLOWED_HOSTS: 'roctnetfrontend,roctnetbackend'
+      DJANGO_CORS_HOSTS: 'http://roctnetfrontend,http://roctnetbackend'
+    stdin_open: true
+    ports:
+      - 8000:8000
+    expose:
+      - 8000
+    # volumes:
+    #   - ./roctnet_frontend/src:/app/src
+    #   - ./roctnet_frontend/public:/app/public
+    networks:
+      - roctnet
+
+  # roctnetmodel:
+  #   build:
+  #     context: ./roctnet_model
+  #     dockerfile: Dockerfile
+  #   container_name: roctnetmodel
+  #   restart: always
+  #   ports:
+  #     - 8001:8001
+  #   expose:
+  #     - 8001
+  #   networks:
+  #     - roctnet
+
+volumes:
+  pgdata:
+
+networks:
+  roctnet:
+    driver: bridge
